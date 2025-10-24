@@ -1,0 +1,261 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Text Cleaner & Summarizer</title>
+  <style>
+    body {
+      font-family: system-ui, sans-serif;
+      background: #0d0d0d;
+      color: #e5e5e5;
+      display: flex;
+      justify-content: center;
+      align-items: flex-start;
+      min-height: 100vh;
+      margin: 0;
+      padding: 2rem;
+    }
+
+    .container {
+      background: #141414;
+      border: 1px solid #2a2a2a;
+      border-radius: 16px;
+      max-width: 800px;
+      width: 100%;
+      padding: 1.5rem 2rem;
+      box-shadow: 0 0 20px #000;
+    }
+
+    h1 {
+      font-size: 1.6rem;
+      margin-bottom: 0.25rem;
+    }
+
+    .sub {
+      font-size: 0.85rem;
+      color: #888;
+      margin-bottom: 1.5rem;
+    }
+
+    textarea {
+      width: 100%;
+      height: 160px;
+      background: #0d0d0d;
+      color: #e5e5e5;
+      border: 1px solid #333;
+      border-radius: 10px;
+      padding: 0.75rem;
+      resize: vertical;
+      font-family: monospace;
+      font-size: 0.9rem;
+    }
+
+    .input-box {
+      border: 2px dashed #333;
+      border-radius: 10px;
+      padding: 1.5rem;
+      text-align: center;
+      margin-bottom: 1rem;
+      cursor: pointer;
+      transition: border 0.3s;
+    }
+    .input-box:hover {
+      border-color: #666;
+    }
+
+    button {
+      background: #fff;
+      color: #000;
+      border: none;
+      padding: 0.6rem 1.2rem;
+      border-radius: 8px;
+      cursor: pointer;
+      font-weight: 600;
+      margin-right: 0.5rem;
+    }
+    button:disabled {
+      opacity: 0.5;
+      cursor: not-allowed;
+    }
+
+    .secondary {
+      background: transparent;
+      border: 1px solid #444;
+      color: #ccc;
+    }
+
+    pre {
+      background: #0d0d0d;
+      border: 1px solid #333;
+      border-radius: 10px;
+      padding: 0.75rem;
+      white-space: pre-wrap;
+      overflow-x: auto;
+      font-family: monospace;
+      font-size: 0.85rem;
+      line-height: 1.4;
+    }
+
+    .output {
+      margin-top: 1.5rem;
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 1rem;
+    }
+
+    .panel {
+      background: #111;
+      border: 1px solid #222;
+      border-radius: 10px;
+      padding: 1rem;
+    }
+
+    .panel h2 {
+      font-size: 1rem;
+      color: #aaa;
+      margin-bottom: 0.5rem;
+    }
+
+    .error {
+      background: #3b0b0b;
+      border: 1px solid #661010;
+      color: #ffaaaa;
+      padding: 0.5rem 0.75rem;
+      border-radius: 8px;
+      margin-top: 1rem;
+    }
+  </style>
+</head>
+<body>
+  <div class="container">
+    <h1>Text Cleaner & Summarizer</h1>
+    <div class="sub">Connects to FastAPI at <code id="api-url">http://127.0.0.1:8000</code></div>
+
+    <div>
+      <div class="input-box" id="drop-area">
+        <p>Drag & drop your <b>.txt</b> or <b>.html</b> file here<br>or click to select one</p>
+        <input type="file" id="file-input" accept=".txt,.html" hidden />
+        <p id="file-name" style="color:#aaa; margin-top:0.5rem;"></p>
+      </div>
+
+      <textarea id="text-input" placeholder="Or paste text or HTML manually..."></textarea>
+
+      <div style="margin-top:1rem;">
+        <button id="submit-btn">Clean & Summarize</button>
+        <button id="reset-btn" class="secondary">Reset</button>
+      </div>
+
+      <div id="status" style="margin-top:1rem; font-size:0.9rem; color:#aaa;"></div>
+      <div id="error" class="error" style="display:none;"></div>
+
+      <div id="output" class="output" style="display:none;">
+        <div class="panel">
+          <h2>Cleaned Preview (first 500 chars)</h2>
+          <pre id="preview"></pre>
+        </div>
+        <div class="panel">
+          <h2>Summary</h2>
+          <pre id="summary"></pre>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <script>
+    const API_BASE = document.getElementById("api-url").textContent;
+    const dropArea = document.getElementById("drop-area");
+    const fileInput = document.getElementById("file-input");
+    const fileName = document.getElementById("file-name");
+    const textInput = document.getElementById("text-input");
+    const submitBtn = document.getElementById("submit-btn");
+    const resetBtn = document.getElementById("reset-btn");
+    const statusEl = document.getElementById("status");
+    const errorEl = document.getElementById("error");
+    const outputEl = document.getElementById("output");
+    const previewEl = document.getElementById("preview");
+    const summaryEl = document.getElementById("summary");
+
+    let selectedFile = null;
+
+    dropArea.addEventListener("click", () => fileInput.click());
+    fileInput.addEventListener("change", (e) => {
+      selectedFile = e.target.files[0];
+      fileName.textContent = selectedFile ? `Selected: ${selectedFile.name}` : "";
+    });
+
+    dropArea.addEventListener("dragover", (e) => {
+      e.preventDefault();
+      dropArea.style.borderColor = "#777";
+    });
+
+    dropArea.addEventListener("dragleave", () => {
+      dropArea.style.borderColor = "#333";
+    });
+
+    dropArea.addEventListener("drop", (e) => {
+      e.preventDefault();
+      dropArea.style.borderColor = "#333";
+      const file = e.dataTransfer.files[0];
+      if (file) {
+        selectedFile = file;
+        fileName.textContent = `Selected: ${file.name}`;
+      }
+    });
+
+    submitBtn.addEventListener("click", async () => {
+      try {
+        statusEl.textContent = "Processing...";
+        errorEl.style.display = "none";
+        outputEl.style.display = "none";
+        submitBtn.disabled = true;
+
+        let fileToSend = selectedFile;
+        if (!fileToSend && textInput.value.trim()) {
+          const blob = new Blob([textInput.value], { type: "text/plain" });
+          fileToSend = new File([blob], "input.txt", { type: "text/plain" });
+        }
+
+        if (!fileToSend) {
+          throw new Error("Please select a file or enter some text first.");
+        }
+
+        const formData = new FormData();
+        formData.append("file", fileToSend);
+
+        const response = await fetch(`${API_BASE}/text/clean-and-summarize`, {
+          method: "POST",
+          body: formData,
+        });
+
+        if (!response.ok) {
+          const errText = await response.text();
+          throw new Error(`Server error: ${errText}`);
+        }
+
+        const data = await response.json();
+        previewEl.textContent = data.preview || "—";
+        summaryEl.textContent = data.summary || "—";
+
+        outputEl.style.display = "grid";
+        statusEl.textContent = "✅ Done!";
+      } catch (err) {
+        errorEl.textContent = err.message || "Something went wrong.";
+        errorEl.style.display = "block";
+      } finally {
+        submitBtn.disabled = false;
+      }
+    });
+
+    resetBtn.addEventListener("click", () => {
+      selectedFile = null;
+      fileInput.value = "";
+      fileName.textContent = "";
+      textInput.value = "";
+      statusEl.textContent = "";
+      errorEl.style.display = "none";
+      outputEl.style.display = "none";
+    });
+  </script>
+</body>
+</html>
