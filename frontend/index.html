@@ -3,7 +3,7 @@
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-  <title>Text Cleaner & Summarizer</title>
+  <title>Text Cleaner, Summarizer & Sentiment Analyzer</title>
   <style>
     body {
       font-family: system-ui, sans-serif;
@@ -21,7 +21,7 @@
       background: #141414;
       border: 1px solid #2a2a2a;
       border-radius: 16px;
-      max-width: 800px;
+      max-width: 900px;
       width: 100%;
       padding: 1.5rem 2rem;
       box-shadow: 0 0 20px #000;
@@ -60,6 +60,7 @@
       cursor: pointer;
       transition: border 0.3s;
     }
+
     .input-box:hover {
       border-color: #666;
     }
@@ -74,6 +75,7 @@
       font-weight: 600;
       margin-right: 0.5rem;
     }
+
     button:disabled {
       opacity: 0.5;
       cursor: not-allowed;
@@ -100,7 +102,7 @@
     .output {
       margin-top: 1.5rem;
       display: grid;
-      grid-template-columns: 1fr 1fr;
+      grid-template-columns: 1fr 1fr 1fr;
       gap: 1rem;
     }
 
@@ -125,11 +127,27 @@
       border-radius: 8px;
       margin-top: 1rem;
     }
+
+    .sentiment-label {
+      font-weight: bold;
+      font-size: 1.2rem;
+      margin-top: 0.5rem;
+    }
+
+    .positive { color: #4ade80; }
+    .negative { color: #ef4444; }
+    .neutral { color: #eab308; }
+
+    @media (max-width: 800px) {
+      .output {
+        grid-template-columns: 1fr;
+      }
+    }
   </style>
 </head>
 <body>
   <div class="container">
-    <h1>Text Cleaner & Summarizer</h1>
+    <h1>Text Cleaner, Summarizer & Sentiment Analyzer</h1>
     <div class="sub">Connects to FastAPI at <code id="api-url">http://127.0.0.1:8000</code></div>
 
     <div>
@@ -142,7 +160,7 @@
       <textarea id="text-input" placeholder="Or paste text or HTML manually..."></textarea>
 
       <div style="margin-top:1rem;">
-        <button id="submit-btn">Clean & Summarize</button>
+        <button id="submit-btn">Clean, Summarize & Analyze</button>
         <button id="reset-btn" class="secondary">Reset</button>
       </div>
 
@@ -157,6 +175,11 @@
         <div class="panel">
           <h2>Summary</h2>
           <pre id="summary"></pre>
+        </div>
+        <div class="panel">
+          <h2>Sentiment</h2>
+          <div id="sentiment" class="sentiment-label"></div>
+          <p id="confidence" style="color:#999; font-size:0.85rem;"></p>
         </div>
       </div>
     </div>
@@ -175,6 +198,8 @@
     const outputEl = document.getElementById("output");
     const previewEl = document.getElementById("preview");
     const summaryEl = document.getElementById("summary");
+    const sentimentEl = document.getElementById("sentiment");
+    const confidenceEl = document.getElementById("confidence");
 
     let selectedFile = null;
 
@@ -223,7 +248,7 @@
         const formData = new FormData();
         formData.append("file", fileToSend);
 
-        const response = await fetch(`${API_BASE}/text/clean-and-summarize`, {
+        const response = await fetch(`${API_BASE}/clean-and-summarize`, {
           method: "POST",
           body: formData,
         });
@@ -236,6 +261,17 @@
         const data = await response.json();
         previewEl.textContent = data.preview || "—";
         summaryEl.textContent = data.summary || "—";
+
+        // Sentiment display
+        if (data.sentiment && data.sentiment.label) {
+          const label = data.sentiment.label.toLowerCase();
+          sentimentEl.textContent = data.sentiment.label;
+          sentimentEl.className = `sentiment-label ${label}`;
+          confidenceEl.textContent = `Confidence: ${Math.round(data.sentiment.score * 100)}%`;
+        } else {
+          sentimentEl.textContent = "N/A";
+          confidenceEl.textContent = "";
+        }
 
         outputEl.style.display = "grid";
         statusEl.textContent = "✅ Done!";
